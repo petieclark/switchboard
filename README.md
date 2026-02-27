@@ -38,7 +38,7 @@ That's it.
 ### Without Docker
 
 ```bash
-git clone https://github.com/yourusername/switchboard
+git clone https://github.com/warpapaya/switchboard
 cd switchboard
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
