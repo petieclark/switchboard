@@ -1,0 +1,21 @@
+services:
+  switchboard:
+    image: switchboard:latest
+    build: .
+    container_name: switchboard
+    restart: unless-stopped
+    ports:
+      - "${PORT:-19400}:19400"
+    volumes:
+      - switchboard_data:/data
+    environment:
+      - SWITCHBOARD_DB=/data/switchboard.db
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:19400/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+volumes:
+  switchboard_data:
