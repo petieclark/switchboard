@@ -1,9 +1,8 @@
 #!/usr/bin/env bash
 # task-to-outline.sh — publish a completed Switchboard task to Outline
-# Format mirrors a PR: overview, context/brief, changes made, output/deliverable
+# PR-style format: overview table, brief/context, changes/deliverable, QA review
 #
 # Usage: task-to-outline.sh <task_id>
-#
 # Publishes to the "Switchboard Output" collection.
 
 set -euo pipefail
@@ -15,82 +14,53 @@ COLLECTION_ID="5d0f7695-d7b7-49f6-a914-82dd9e9aafc5"  # Switchboard Output
 
 TASK_ID="${1:?Usage: task-to-outline.sh <task_id>}"
 
-# ── Fetch task ────────────────────────────────────────────────────────────────
-TASK=$(curl -sf "$BASE/tasks/$TASK_ID")
-if [[ -z "$TASK" ]]; then
+# ── Fetch task JSON ────────────────────────────────────────────────────────────
+TASK_JSON=$(curl -sf "$BASE/tasks/$TASK_ID")
+if [[ -z "$TASK_JSON" ]]; then
   echo "ERROR: Task $TASK_ID not found" >&2
   exit 1
 fi
 
-TITLE=$(echo "$TASK" | python3 -c "import json,sys; t=json.load(sys.stdin); print(t['title'])")
-STATUS=$(echo "$TASK" | python3 -c "import json,sys; t=json.load(sys.stdin); print(t['status'])")
-PRIORITY=$(echo "$TASK" | python3 -c "import json,sys; t=json.load(sys.stdin); print(t.get('priority','normal'))")
-ASSIGNEE=$(echo "$TASK" | python3 -c "import json,sys; t=json.load(sys.stdin); print(t.get('assignee') or 'unknown')")
-CONTEXT=$(echo "$TASK" | python3 -c "import json,sys; t=json.load(sys.stdin); print(t.get('context',''))")
-OUTPUT=$(echo "$TASK" | python3 -c "import json,sys; t=json.load(sys.stdin); print(t.get('output',''))")
-REVIEW_NOTES=$(echo "$TASK" | python3 -c "import json,sys; t=json.load(sys.stdin); print(t.get('review_notes',''))")
-ITERATION=$(echo "$TASK" | python3 -c "import json,sys; t=json.load(sys.stdin); print(t.get('iteration',0))")
-TAGS=$(echo "$TASK" | python3 -c "import json,sys; t=json.load(sys.stdin); tags=t.get('tags',[]); print(', '.join(tags) if tags else 'none')")
-CREATED_AT=$(echo "$TASK" | python3 -c "import json,sys; t=json.load(sys.stdin); print(t.get('created_at','')[:10])")
-UPDATED_AT=$(echo "$TASK" | python3 -c "import json,sys; t=json.load(sys.stdin); print(t.get('updated_at','')[:16].replace('T',' '))")
+# ── Build doc + publish, all in Python (avoids shell escaping hell) ────────────
+python3 - "$TASK_JSON" "$TASK_ID" "$OUTLINE_BASE" "$OUTLINE_KEY" "$COLLECTION_ID" "$BASE" <<'PYEOF'
+import sys, json, re, urllib.request, urllib.error
 
-# ── Detect task type from tags ────────────────────────────────────────────────
-IS_CODE=false
-IS_CONTENT=false
-IS_RESEARCH=false
+task      = json.loads(sys.argv[1])
+task_id   = sys.argv[2]
+outline   = sys.argv[3]
+key       = sys.argv[4]
+coll_id   = sys.argv[5]
+api_base  = sys.argv[6]
 
-echo "$TAGS" | grep -qiE "ios|swift|maeve|code|fix|bug|css|js|python|go|docker|infra|ops|cleanup|deploy" && IS_CODE=true
-echo "$TAGS" | grep -qiE "linkedin|blog|writing|post|content|copy|draft" && IS_CONTENT=true
-echo "$TAGS" | grep -qiE "research|atlas|analysis|investigate|report" && IS_RESEARCH=true
+title        = task.get("title", "")
+status       = task.get("status", "done")
+priority     = task.get("priority", "normal")
+assignee     = task.get("assignee") or "unknown"
+context      = task.get("context") or ""
+output       = task.get("output") or ""
+review_notes = task.get("review_notes") or ""
+iteration    = task.get("iteration", 0)
+tags         = task.get("tags") or []
+created_at   = (task.get("created_at") or "")[:10]
+updated_at   = (task.get("updated_at") or "")[:16].replace("T", " ")
 
-# ── Priority badge ─────────────────────────────────────────────────────────────
-case "$PRIORITY" in
-  critical) PRIORITY_BADGE="🔴 critical" ;;
-  high)     PRIORITY_BADGE="🟠 high" ;;
-  normal)   PRIORITY_BADGE="🟡 normal" ;;
-  low)      PRIORITY_BADGE="🟢 low" ;;
-  *)        PRIORITY_BADGE="$PRIORITY" ;;
-esac
+tags_str = ", ".join(tags) if tags else "none"
+tags_lower = tags_str.lower()
 
-# ── Agent badge ────────────────────────────────────────────────────────────────
-case "$ASSIGNEE" in
-  maeve)  AGENT_EMOJI="⚙️ maeve" ;;
-  atlas)  AGENT_EMOJI="🔍 atlas" ;;
-  ops)    AGENT_EMOJI="🛠️ ops" ;;
-  friday) AGENT_EMOJI="🎯 friday" ;;
-  qa)     AGENT_EMOJI="✅ qa" ;;
-  *)      AGENT_EMOJI="🤖 $ASSIGNEE" ;;
-esac
+# ── Detect type from tags ──────────────────────────────────────────────────────
+is_code     = bool(re.search(r'ios|swift|maeve|code|fix|bug|css|js|python|go|docker|infra|ops|cleanup|deploy', tags_lower))
+is_content  = bool(re.search(r'linkedin|blog|writing|post|content|copy|draft', tags_lower))
+is_research = bool(re.search(r'research|atlas|analysis|investigate|report|push', tags_lower))
 
-# ── Iteration note ─────────────────────────────────────────────────────────────
-ITER_NOTE=""
-if [[ "$ITERATION" -gt 0 ]]; then
-  ITER_NOTE="↩ Returned to worker $ITERATION time(s) by QA before passing"
-fi
+# ── Badges ─────────────────────────────────────────────────────────────────────
+priority_badges = {"critical": "🔴 critical", "high": "🟠 high", "normal": "🟡 normal", "low": "🟢 low"}
+agent_emojis    = {"maeve": "⚙️ maeve", "atlas": "🔍 atlas", "ops": "🛠️ ops", "friday": "🎯 friday", "qa": "✅ qa"}
+priority_badge  = priority_badges.get(priority, priority)
+agent_badge     = agent_emojis.get(assignee, f"🤖 {assignee}")
 
-# ── Build document ─────────────────────────────────────────────────────────────
-DOC=$(python3 - <<PYEOF
-import sys
-
-title = """$TITLE"""
-task_id = "$TASK_ID"
-status = "$STATUS"
-priority_badge = """$PRIORITY_BADGE"""
-agent_emoji = """$AGENT_EMOJI"""
-created_at = "$CREATED_AT"
-updated_at = "$UPDATED_AT"
-tags = """$TAGS"""
-iter_note = """$ITER_NOTE"""
-review_notes = """$REVIEW_NOTES"""
-context = """$CONTEXT"""
-output = """$OUTPUT"""
-is_code = $IS_CODE
-is_content = $IS_CONTENT
-is_research = $IS_RESEARCH
-
+# ── Build markdown ─────────────────────────────────────────────────────────────
 lines = []
 
-# ── Header ────────────────────────────────────────────────────────────────────
 lines.append(f"# {title}")
 lines.append("")
 lines.append("| | |")
@@ -98,52 +68,43 @@ lines.append("|---|---|")
 lines.append(f"| **Task** | #{task_id} |")
 lines.append(f"| **Status** | ✅ done |")
 lines.append(f"| **Priority** | {priority_badge} |")
-lines.append(f"| **Agent** | {agent_emoji} |")
-lines.append(f"| **Tags** | \`{tags}\` |")
+lines.append(f"| **Agent** | {agent_badge} |")
+lines.append(f"| **Tags** | `{tags_str}` |")
 lines.append(f"| **Completed** | {updated_at} UTC |")
-if iter_note:
-    lines.append(f"| **Revisions** | {iter_note} |")
+if iteration > 0:
+    lines.append(f"| **Revisions** | ↩ Returned to worker {iteration}x before passing |")
 lines.append("")
 lines.append("---")
 lines.append("")
 
-# ── Brief / Context ────────────────────────────────────────────────────────────
+# ── Brief ──────────────────────────────────────────────────────────────────────
 lines.append("## Brief")
 lines.append("")
 lines.append("> *What the agent was asked to do*")
 lines.append("")
-if context:
-    lines.append(context)
-else:
-    lines.append("*(no context provided)*")
+lines.append(context if context else "*(no context provided)*")
 lines.append("")
 lines.append("---")
 lines.append("")
 
-# ── Output section — format depends on task type ───────────────────────────────
-if is_code:
-    lines.append("## Changes")
-    lines.append("")
-    lines.append("> *Files modified, commands run, verification results*")
-    lines.append("")
-elif is_content:
+# ── Output section (type-aware heading) ───────────────────────────────────────
+if is_content:
     lines.append("## Deliverable")
     lines.append("")
     lines.append("> *Final content produced*")
-    lines.append("")
 elif is_research:
     lines.append("## Findings")
     lines.append("")
     lines.append("> *Research results, analysis, and recommendations*")
+elif is_code:
+    lines.append("## Changes")
     lines.append("")
+    lines.append("> *Files modified, commands run, verification results*")
 else:
     lines.append("## Output")
     lines.append("")
-
-if output:
-    lines.append(output)
-else:
-    lines.append("*(no output recorded)*")
+lines.append("")
+lines.append(output if output else "*(no output recorded)*")
 lines.append("")
 lines.append("---")
 lines.append("")
@@ -152,15 +113,14 @@ lines.append("")
 lines.append("## QA Review")
 lines.append("")
 if review_notes:
-    # Split QA1 and QA2 passes for clarity
-    for line in review_notes.split("\\n"):
+    for line in review_notes.split("\n"):
         line = line.strip()
-        if not line:
+        if not line or line.startswith("📎 Outline:"):
             continue
         if line.startswith("QA1:PASS"):
-            lines.append(f"✅ **QA1 Pass** — {line.replace('QA1:PASS — ','')}")
+            lines.append(f"✅ **QA1 Pass** — {line.replace('QA1:PASS — ', '').replace('QA1:PASS', '')}")
         elif line.startswith("QA2:PASS"):
-            lines.append(f"✅ **QA2 Pass** — {line.replace('QA2:PASS — ','')}")
+            lines.append(f"✅ **QA2 Pass** — {line.replace('QA2:PASS — ', '').replace('QA2:PASS', '')}")
         elif line.startswith("❌"):
             lines.append(f"🔄 **Returned** — {line}")
         else:
@@ -169,43 +129,43 @@ else:
     lines.append("*(no review notes)*")
 lines.append("")
 
-print("\\n".join(lines))
-PYEOF
-)
+doc_md = "\n".join(lines)
+doc_title = f"[#{task_id}] {title}"
 
 # ── Publish to Outline ─────────────────────────────────────────────────────────
-DOC_TITLE="[#${TASK_ID}] ${TITLE}"
+payload = json.dumps({
+    "title": doc_title,
+    "text": doc_md,
+    "collectionId": coll_id,
+    "publish": True
+}).encode("utf-8")
 
-PAYLOAD=$(python3 -c "
-import json, sys
-title = sys.argv[1]
-text = sys.argv[2]
-collection = sys.argv[3]
-print(json.dumps({
-  'title': title,
-  'text': text,
-  'collectionId': collection,
-  'publish': True
-}))
-" "$DOC_TITLE" "$DOC" "$COLLECTION_ID")
+req = urllib.request.Request(
+    f"{outline}/api/documents.create",
+    data=payload,
+    headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
+    method="POST"
+)
+try:
+    with urllib.request.urlopen(req) as resp:
+        result = json.loads(resp.read())
+    doc_url = result["data"]["url"]
+    doc_id  = result["data"]["id"]
+    print(f"✅ Published: {doc_url}")
 
-RESPONSE=$(curl -sf -X POST "$OUTLINE_BASE/api/documents.create" \
-  -H "Authorization: Bearer $OUTLINE_KEY" \
-  -H "Content-Type: application/json" \
-  -d "$PAYLOAD")
-
-DOC_ID=$(echo "$RESPONSE" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d['data']['id'])" 2>/dev/null || echo "")
-DOC_URL=$(echo "$RESPONSE" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d['data']['url'])" 2>/dev/null || echo "")
-
-if [[ -n "$DOC_ID" ]]; then
-  echo "✅ Published to Outline: $DOC_URL"
-  # Patch outline_url onto the task (store in output suffix)
-  curl -sf -X PATCH "$BASE/tasks/$TASK_ID" \
-    -H "Content-Type: application/json" \
-    -d "{\"review_notes\": $(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$REVIEW_NOTES
-📎 Outline: $DOC_URL")}" > /dev/null
-else
-  echo "ERROR: Outline publish failed" >&2
-  echo "$RESPONSE" >&2
-  exit 1
-fi
+    # Patch Outline URL into review_notes
+    new_notes = review_notes.rstrip() + f"\n📎 Outline: {doc_url}"
+    patch = json.dumps({"review_notes": new_notes}).encode("utf-8")
+    patch_req = urllib.request.Request(
+        f"{api_base}/tasks/{task_id}",
+        data=patch,
+        headers={"Content-Type": "application/json"},
+        method="PATCH"
+    )
+    with urllib.request.urlopen(patch_req):
+        pass
+except urllib.error.HTTPError as e:
+    body = e.read().decode()
+    print(f"ERROR: Outline publish failed ({e.code}): {body}", file=sys.stderr)
+    sys.exit(1)
+PYEOF
