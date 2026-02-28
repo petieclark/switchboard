@@ -31,18 +31,20 @@ PRIORITY_ORDER = {"urgent": 0, "high": 1, "normal": 2, "low": 3}
 # ── DB Bootstrap ───────────────────────────────────────────────────────────────
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS tasks (
-    id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    title       TEXT    NOT NULL,
-    description TEXT    DEFAULT '',
-    context     TEXT    DEFAULT '',
-    output      TEXT    DEFAULT '',
-    tags        TEXT    DEFAULT '[]',
-    status      TEXT    NOT NULL DEFAULT 'inbox',
-    priority    TEXT    NOT NULL DEFAULT 'normal',
-    created_by  TEXT    NOT NULL DEFAULT 'unknown',
-    assignee    TEXT    DEFAULT NULL,
-    created_at  TEXT    NOT NULL,
-    updated_at  TEXT    NOT NULL
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    title        TEXT    NOT NULL,
+    description  TEXT    DEFAULT '',
+    context      TEXT    DEFAULT '',
+    output       TEXT    DEFAULT '',
+    review_notes TEXT    DEFAULT '',
+    iteration    INTEGER DEFAULT 0,
+    tags         TEXT    DEFAULT '[]',
+    status       TEXT    NOT NULL DEFAULT 'inbox',
+    priority     TEXT    NOT NULL DEFAULT 'normal',
+    created_by   TEXT    NOT NULL DEFAULT 'unknown',
+    assignee     TEXT    DEFAULT NULL,
+    created_at   TEXT    NOT NULL,
+    updated_at   TEXT    NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS agents (
@@ -64,9 +66,11 @@ CREATE TABLE IF NOT EXISTS messages (
 """
 
 MIGRATIONS = [
-    "ALTER TABLE tasks ADD COLUMN context TEXT DEFAULT ''",
-    "ALTER TABLE tasks ADD COLUMN output  TEXT DEFAULT ''",
-    "ALTER TABLE tasks ADD COLUMN tags    TEXT DEFAULT '[]'",
+    "ALTER TABLE tasks ADD COLUMN context      TEXT    DEFAULT ''",
+    "ALTER TABLE tasks ADD COLUMN output       TEXT    DEFAULT ''",
+    "ALTER TABLE tasks ADD COLUMN tags         TEXT    DEFAULT '[]'",
+    "ALTER TABLE tasks ADD COLUMN review_notes TEXT    DEFAULT ''",
+    "ALTER TABLE tasks ADD COLUMN iteration    INTEGER DEFAULT 0",
 ]
 
 def init_db():
@@ -126,6 +130,8 @@ class TaskUpdate(BaseModel):
     description: Optional[str] = None
     context: Optional[str] = None
     output: Optional[str] = None
+    review_notes: Optional[str] = None
+    iteration: Optional[int] = None
     tags: Optional[List[str]] = None
     status: Optional[str] = None
     priority: Optional[str] = None
@@ -184,32 +190,36 @@ def create_task(body: TaskCreate):
     tags_json = json.dumps(body.tags or [])
     with get_db() as con:
         cur = con.execute("""
-            INSERT INTO tasks(title, description, context, output, tags, status, priority, created_by, assignee, created_at, updated_at)
-            VALUES (?, ?, ?, '', ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO tasks(title, description, context, output, review_notes, iteration, tags, status, priority, created_by, assignee, created_at, updated_at)
+            VALUES (?, ?, ?, '', '', 0, ?, ?, ?, ?, ?, ?, ?)
         """, (body.title, body.description, body.context, tags_json,
               body.status, body.priority, body.created_by, body.assignee, ts, ts))
         task_id = cur.lastrowid
     return {"id": task_id, "title": body.title, "status": body.status}
 
 @app.get("/tasks/queue")
-def task_queue(agent: str = Query(..., description="Agent name to fetch work for")):
+def task_queue(
+    agent: str = Query(..., description="Agent name to fetch work for"),
+    status: str = Query("todo", description="Status to queue from (todo or review)"),
+):
     """
     Return the next claimable task for an agent.
-    Returns tasks in status=todo assigned to this agent (or unassigned),
-    ordered by priority then age.
+    - status=todo  → tasks ready to be worked (default, worker agents)
+    - status=review → tasks awaiting QA review
     """
+    if status not in ("todo", "review"):
+        raise HTTPException(400, "status must be 'todo' or 'review'")
     with get_db() as con:
         rows = con.execute("""
             SELECT * FROM tasks
-            WHERE status = 'todo'
+            WHERE status = ?
               AND (assignee = ? OR assignee IS NULL)
             ORDER BY created_at ASC
-        """, (agent,)).fetchall()
+        """, (status, agent)).fetchall()
 
     tasks = [row_to_dict(r) for r in rows]
-    # Sort by priority order
     tasks.sort(key=lambda t: PRIORITY_ORDER.get(t.get("priority", "normal"), 2))
-    return {"agent": agent, "queue": tasks, "count": len(tasks)}
+    return {"agent": agent, "status": status, "queue": tasks, "count": len(tasks)}
 
 @app.post("/tasks/{task_id}/claim")
 def claim_task(task_id: int, agent: str = Query(..., description="Agent claiming this task")):
@@ -225,7 +235,7 @@ def claim_task(task_id: int, agent: str = Query(..., description="Agent claiming
 
         if task["status"] == "in_progress":
             raise HTTPException(409, f"Task already in progress by {task.get('assignee', 'unknown')}")
-        if task["status"] not in ("todo", "inbox"):
+        if task["status"] not in ("todo", "inbox", "review"):
             raise HTTPException(409, f"Task cannot be claimed from status: {task['status']}")
 
         ts = now_iso()

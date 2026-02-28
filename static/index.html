@@ -512,9 +512,12 @@ header {
 .detail-context-head { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; color: var(--blue); margin-bottom: 5px; }
 .detail-output { background: rgba(34,197,94,.07); border-left: 3px solid var(--green); border-radius: 0 6px 6px 0; padding: 10px 12px; font-size: 12px; color: var(--text); line-height: 1.6; white-space: pre-wrap; }
 .detail-output-head { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; color: var(--green); margin-bottom: 5px; }
+.detail-review { background: rgba(167,139,250,.07); border-left: 3px solid var(--purple); border-radius: 0 6px 6px 0; padding: 10px 12px; font-size: 12px; color: var(--text); line-height: 1.6; white-space: pre-wrap; }
+.detail-review-head { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; color: var(--purple); margin-bottom: 5px; }
 .detail-tags { display: flex; flex-wrap: wrap; gap: 5px; }
 .tag-chip { background: rgba(245,158,11,.12); color: var(--amber); border-radius: 4px; padding: 2px 7px; font-size: 10px; font-weight: 600; letter-spacing: 0.3px; }
 .card-tags { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 4px; }
+.iteration-badge { display: inline-flex; align-items: center; gap: 3px; background: rgba(167,139,250,.15); color: var(--purple); border-radius: 4px; padding: 1px 6px; font-size: 10px; font-weight: 700; margin-left: 4px; }
 .detail-msgs { margin-top: 4px; }
 .detail-msgs-head { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; color: var(--muted); margin-bottom: 8px; }
 .detail-msg-item { background: var(--surface-2); border-radius: 6px; padding: 8px 10px; margin-bottom: 6px; font-size: 12px; }
@@ -716,6 +719,7 @@ header {
       <div class="detail-meta" id="d-meta"></div>
       <div id="d-context" style="display:none"><div class="detail-context-head">⚡ Instructions</div><div class="detail-context"></div></div>
       <div id="d-output" style="display:none"><div class="detail-output-head">✅ Agent Output</div><div class="detail-output"></div></div>
+      <div id="d-review" style="display:none"><div class="detail-review-head">🔍 Review Notes</div><div class="detail-review"></div></div>
       <div class="detail-msgs" id="d-msgs"></div>
     </div>
   </div>
@@ -821,7 +825,7 @@ function renderBoard() {
           <div class="card-id">#${t.id}</div>
           <div class="card-title">${esc(t.title)}</div>
           ${t.description ? `<div class="card-desc">${esc(t.description)}</div>` : ''}
-          ${t.tags && t.tags.length ? `<div class="card-tags">${t.tags.map(tg=>`<span class="tag-chip">${esc(tg)}</span>`).join('')}</div>` : ''}
+          ${t.tags && t.tags.length ? `<div class="card-tags">${t.tags.map(tg=>`<span class="tag-chip">${esc(tg)}</span>`).join('')}${t.iteration>0?`<span class="iteration-badge">↩ ${t.iteration}</span>`:''}</div>` : (t.iteration>0 ? `<div class="card-tags"><span class="iteration-badge">↩ iter ${t.iteration}</span></div>` : '')}
           <div class="card-foot">
             ${t.assignee ? `<span class="card-assignee">${esc(t.assignee)}</span>` : ''}
             <span class="card-time">${ago(t.updated_at)}</span>
@@ -935,8 +939,14 @@ async function refreshDetail(id) {
     if (task.output) { outWrap.style.display = ''; outWrap.querySelector('.detail-output').textContent = task.output; }
     else outWrap.style.display = 'none';
 
+    // Review notes (QA feedback)
+    const revWrap = document.getElementById('d-review');
+    if (task.review_notes) { revWrap.style.display = ''; revWrap.querySelector('.detail-review').textContent = task.review_notes; }
+    else revWrap.style.display = 'none';
+
+    const iterBadge = task.iteration > 0 ? `<span class="iteration-badge">↩ iter ${task.iteration}</span>` : '';
     document.getElementById('d-meta').innerHTML = `
-      <div class="meta-item"><span class="meta-label">Status</span>   <span class="meta-val"><span class="badge badge-${task.status}">${task.status.replace('_',' ')}</span></span></div>
+      <div class="meta-item"><span class="meta-label">Status</span>   <span class="meta-val"><span class="badge badge-${task.status}">${task.status.replace('_',' ')}</span>${iterBadge}</span></div>
       <div class="meta-item"><span class="meta-label">Priority</span>  <span class="meta-val"><span class="badge badge-pri-${task.priority}">${task.priority}</span></span></div>
       <div class="meta-item"><span class="meta-label">Assignee</span>  <span class="meta-val">${task.assignee ? '@'+task.assignee : '—'}</span></div>
       <div class="meta-item"><span class="meta-label">Created by</span><span class="meta-val">${task.created_by}</span></div>
