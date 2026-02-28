@@ -2,7 +2,7 @@ FROM python:3.12-slim
 
 LABEL org.opencontainers.image.title="Switchboard"
 LABEL org.opencontainers.image.description="Local coordination layer for OpenClaw agents"
-LABEL org.opencontainers.image.source="https://github.com/warpapaya/switchboard"
+LABEL org.opencontainers.image.source="https://github.com/petieclark/switchboard"
 
 WORKDIR /app
 
