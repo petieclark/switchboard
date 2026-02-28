@@ -6,6 +6,9 @@ Switchboard is a self-hosted coordination layer for [OpenClaw](https://openclaw.
 
 Built as an open-source alternative to [MoltBoard](https://moltboard.ai).
 
+[![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-support-%23FFDD00?style=flat&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/petieclark)
+[![License: MIT](https://img.shields.io/badge/License-MIT-amber.svg)](LICENSE)
+
 ![Switchboard Dashboard](docs/screenshot.png)
 
 ---
