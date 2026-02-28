@@ -545,6 +545,25 @@ header {
 .badge-pri-normal  { background: rgba(92,98,120,.2);   color: var(--muted-2); }
 .badge-pri-low     { background: rgba(92,98,120,.15);  color: var(--muted); }
 
+/* ── In-progress pulse ─────────────────────────────────────────────────── */
+@keyframes pulse-ring {
+  0%   { box-shadow: 0 0 0 0 rgba(245,158,11,.5); }
+  70%  { box-shadow: 0 0 0 6px rgba(245,158,11,0); }
+  100% { box-shadow: 0 0 0 0 rgba(245,158,11,0); }
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.card.working { border-color: var(--amber) !important; animation: pulse-ring 2s ease-out infinite; }
+.card.working .card-title::before {
+  content: '';
+  display: inline-block;
+  width: 7px; height: 7px;
+  background: var(--amber);
+  border-radius: 50%;
+  margin-right: 6px;
+  vertical-align: middle;
+  animation: pulse-ring 1.4s ease-out infinite;
+}
+
 /* ── Scrollbar ─────────────────────────────────────────────────────────── */
 ::-webkit-scrollbar { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
@@ -798,7 +817,7 @@ function renderBoard() {
     const items = tasks[col.key] || [];
     const cards = items.length
       ? items.map(t => `
-        <div class="card" data-pri="${t.priority||'normal'}" data-id="${t.id}" onclick="openDetail(${t.id})">
+        <div class="card${t.status==='in_progress'?' working':''}" data-pri="${t.priority||'normal'}" data-id="${t.id}" onclick="openDetail(${t.id})">
           <div class="card-id">#${t.id}</div>
           <div class="card-title">${esc(t.title)}</div>
           ${t.description ? `<div class="card-desc">${esc(t.description)}</div>` : ''}
