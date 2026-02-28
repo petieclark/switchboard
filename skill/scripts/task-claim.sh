@@ -1,10 +1,10 @@
-#!/bin/bash
+#!/usr/bin/env bash
+# task-claim.sh — atomically claim a task (set assignee + move to in_progress)
 # Usage: task-claim.sh <agent_name> <task_id>
-# Assigns the task to this agent and moves it to in_progress
-AGENT="${1:?Agent name required}"
-TASK_ID="${2:?Task ID required}"
-BOARD_URL="${SWITCHBOARD_URL:-http://127.0.0.1:19400}"
+# Returns 409 if already claimed
 
-curl -sf -X PATCH "$BOARD_URL/tasks/$TASK_ID" \
-  -H "Content-Type: application/json" \
-  -d "{\"assignee\":\"$AGENT\",\"status\":\"in_progress\"}" | python3 -m json.tool --no-ensure-ascii
+BASE="${SWITCHBOARD_URL:-http://127.0.0.1:19400}"
+AGENT="${1:?Usage: task-claim.sh <agent_name> <task_id>}"
+TASK_ID="${2:?task_id required}"
+
+curl -sf -X POST "$BASE/tasks/$TASK_ID/claim?agent=$AGENT"

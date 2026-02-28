@@ -9,7 +9,7 @@ import time
 import os
 from datetime import datetime, timezone
 from contextlib import contextmanager
-from typing import Optional
+from typing import Optional, List
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Query
@@ -23,7 +23,10 @@ DB_PATH = Path(_db_env) if _db_env else Path(__file__).parent / "data" / "switch
 DB_PATH.parent.mkdir(parents=True, exist_ok=True)
 STATIC_DIR = Path(__file__).parent / "static"
 
-app = FastAPI(title="Switchboard", version="1.0.0", docs_url="/api/docs")
+app = FastAPI(title="Switchboard", version="2.0.0", docs_url="/api/docs")
+
+# ── Priority ordering ──────────────────────────────────────────────────────────
+PRIORITY_ORDER = {"urgent": 0, "high": 1, "normal": 2, "low": 3}
 
 # ── DB Bootstrap ───────────────────────────────────────────────────────────────
 SCHEMA = """
@@ -31,6 +34,9 @@ CREATE TABLE IF NOT EXISTS tasks (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     title       TEXT    NOT NULL,
     description TEXT    DEFAULT '',
+    context     TEXT    DEFAULT '',
+    output      TEXT    DEFAULT '',
+    tags        TEXT    DEFAULT '[]',
     status      TEXT    NOT NULL DEFAULT 'inbox',
     priority    TEXT    NOT NULL DEFAULT 'normal',
     created_by  TEXT    NOT NULL DEFAULT 'unknown',
@@ -57,9 +63,22 @@ CREATE TABLE IF NOT EXISTS messages (
 );
 """
 
+MIGRATIONS = [
+    "ALTER TABLE tasks ADD COLUMN context TEXT DEFAULT ''",
+    "ALTER TABLE tasks ADD COLUMN output  TEXT DEFAULT ''",
+    "ALTER TABLE tasks ADD COLUMN tags    TEXT DEFAULT '[]'",
+]
+
 def init_db():
     with sqlite3.connect(DB_PATH) as con:
         con.executescript(SCHEMA)
+        # Run migrations safely (ignore if column already exists)
+        for migration in MIGRATIONS:
+            try:
+                con.execute(migration)
+                con.commit()
+            except sqlite3.OperationalError:
+                pass  # Column already exists
 
 init_db()
 
@@ -79,7 +98,14 @@ def now_iso():
 def row_to_dict(row):
     if row is None:
         return None
-    return dict(row)
+    d = dict(row)
+    # Parse tags JSON
+    if "tags" in d and isinstance(d["tags"], str):
+        try:
+            d["tags"] = json.loads(d["tags"])
+        except Exception:
+            d["tags"] = []
+    return d
 
 # ── Models ─────────────────────────────────────────────────────────────────────
 VALID_STATUSES = {"inbox", "todo", "in_progress", "review", "done", "failed", "blocked"}
@@ -88,6 +114,8 @@ VALID_PRIORITIES = {"low", "normal", "high", "urgent"}
 class TaskCreate(BaseModel):
     title: str
     description: Optional[str] = ""
+    context: Optional[str] = ""
+    tags: Optional[List[str]] = []
     status: Optional[str] = "inbox"
     priority: Optional[str] = "normal"
     created_by: Optional[str] = "unknown"
@@ -96,6 +124,9 @@ class TaskCreate(BaseModel):
 class TaskUpdate(BaseModel):
     title: Optional[str] = None
     description: Optional[str] = None
+    context: Optional[str] = None
+    output: Optional[str] = None
+    tags: Optional[List[str]] = None
     status: Optional[str] = None
     priority: Optional[str] = None
     assignee: Optional[str] = None
@@ -114,7 +145,7 @@ class MessageCreate(BaseModel):
 # ── Health ─────────────────────────────────────────────────────────────────────
 @app.get("/health")
 def health():
-    return {"status": "ok", "ts": now_iso()}
+    return {"status": "ok", "ts": now_iso(), "version": "2.0.0"}
 
 # ── Agents ─────────────────────────────────────────────────────────────────────
 @app.post("/agents/heartbeat")
@@ -135,7 +166,6 @@ def list_agents():
     with get_db() as con:
         rows = con.execute("SELECT * FROM agents ORDER BY last_heartbeat DESC").fetchall()
     agents = [row_to_dict(r) for r in rows]
-    # Mark agents offline if no heartbeat in 5 min
     cutoff = time.time() - 300
     for a in agents:
         ts = datetime.fromisoformat(a["last_heartbeat"]).timestamp()
@@ -151,20 +181,68 @@ def create_task(body: TaskCreate):
     if body.priority not in VALID_PRIORITIES:
         raise HTTPException(400, f"Invalid priority. Valid: {VALID_PRIORITIES}")
     ts = now_iso()
+    tags_json = json.dumps(body.tags or [])
     with get_db() as con:
         cur = con.execute("""
-            INSERT INTO tasks(title, description, status, priority, created_by, assignee, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        """, (body.title, body.description, body.status, body.priority,
-              body.created_by, body.assignee, ts, ts))
+            INSERT INTO tasks(title, description, context, output, tags, status, priority, created_by, assignee, created_at, updated_at)
+            VALUES (?, ?, ?, '', ?, ?, ?, ?, ?, ?, ?)
+        """, (body.title, body.description, body.context, tags_json,
+              body.status, body.priority, body.created_by, body.assignee, ts, ts))
         task_id = cur.lastrowid
     return {"id": task_id, "title": body.title, "status": body.status}
+
+@app.get("/tasks/queue")
+def task_queue(agent: str = Query(..., description="Agent name to fetch work for")):
+    """
+    Return the next claimable task for an agent.
+    Returns tasks in status=todo assigned to this agent (or unassigned),
+    ordered by priority then age.
+    """
+    with get_db() as con:
+        rows = con.execute("""
+            SELECT * FROM tasks
+            WHERE status = 'todo'
+              AND (assignee = ? OR assignee IS NULL)
+            ORDER BY created_at ASC
+        """, (agent,)).fetchall()
+
+    tasks = [row_to_dict(r) for r in rows]
+    # Sort by priority order
+    tasks.sort(key=lambda t: PRIORITY_ORDER.get(t.get("priority", "normal"), 2))
+    return {"agent": agent, "queue": tasks, "count": len(tasks)}
+
+@app.post("/tasks/{task_id}/claim")
+def claim_task(task_id: int, agent: str = Query(..., description="Agent claiming this task")):
+    """
+    Atomically claim a task. Sets assignee + moves to in_progress.
+    Returns 409 if task is already claimed/in_progress.
+    """
+    with get_db() as con:
+        row = con.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
+        if not row:
+            raise HTTPException(404, "Task not found")
+        task = row_to_dict(row)
+
+        if task["status"] == "in_progress":
+            raise HTTPException(409, f"Task already in progress by {task.get('assignee', 'unknown')}")
+        if task["status"] not in ("todo", "inbox"):
+            raise HTTPException(409, f"Task cannot be claimed from status: {task['status']}")
+
+        ts = now_iso()
+        con.execute("""
+            UPDATE tasks SET status = 'in_progress', assignee = ?, updated_at = ?
+            WHERE id = ? AND status != 'in_progress'
+        """, (agent, ts, task_id))
+        updated = row_to_dict(con.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone())
+
+    return updated
 
 @app.get("/tasks")
 def list_tasks(
     status: Optional[str] = None,
     assignee: Optional[str] = None,
     created_by: Optional[str] = None,
+    tag: Optional[str] = None,
 ):
     query = "SELECT * FROM tasks WHERE 1=1"
     params = []
@@ -177,6 +255,9 @@ def list_tasks(
     if created_by:
         query += " AND created_by = ?"
         params.append(created_by)
+    if tag:
+        query += " AND tags LIKE ?"
+        params.append(f'%"{tag}"%')
     query += " ORDER BY updated_at DESC"
     with get_db() as con:
         rows = con.execute(query, params).fetchall()
@@ -198,7 +279,13 @@ def update_task(task_id: int, body: TaskUpdate):
         existing = con.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
         if not existing:
             raise HTTPException(404, "Task not found")
-        updates = {k: v for k, v in body.model_dump().items() if v is not None}
+        updates = {}
+        for k, v in body.model_dump().items():
+            if v is not None:
+                if k == "tags":
+                    updates[k] = json.dumps(v)
+                else:
+                    updates[k] = v
         if not updates:
             return row_to_dict(existing)
         updates["updated_at"] = now_iso()
@@ -269,6 +356,7 @@ def board_summary():
         tasks = [row_to_dict(r) for r in con.execute("SELECT * FROM tasks ORDER BY updated_at DESC").fetchall()]
         agents = [row_to_dict(r) for r in con.execute("SELECT * FROM agents ORDER BY last_heartbeat DESC").fetchall()]
         unread_count = con.execute("SELECT COUNT(*) FROM messages WHERE read = 0").fetchone()[0]
+        queued_count = con.execute("SELECT COUNT(*) FROM tasks WHERE status = 'todo'").fetchone()[0]
 
     by_status = {}
     for t in tasks:
@@ -279,6 +367,7 @@ def board_summary():
         "tasks": by_status,
         "agents": agents,
         "unread_messages": unread_count,
+        "queued_tasks": queued_count,
         "totals": {s: len(v) for s, v in by_status.items()},
     }
 
