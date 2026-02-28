@@ -49,6 +49,7 @@ body {
   font-size: 13px;
   line-height: 1.5;
   overflow-x: hidden;
+  font-feature-settings: "cv02","cv03","cv04","tnum";
 }
 button { cursor: pointer; border: none; background: none; font: inherit; color: inherit; }
 a { color: inherit; text-decoration: none; }
@@ -100,7 +101,7 @@ header {
 .stat-val { font-weight: 600; color: var(--text); }
 
 .header-right { margin-left: auto; display: flex; align-items: center; gap: 10px; }
-.refresh-ts { font-size: 11px; color: var(--muted); }
+.refresh-ts { font-size: 11px; color: var(--muted); display: flex; align-items: center; gap: 4px; }
 
 .btn-new {
   display: flex;
@@ -148,16 +149,15 @@ header {
   transition: border-color 0.15s;
 }
 .agent-chip:hover { border-color: var(--border-2); }
-.agent-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
+.agent-status-icon {
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
 }
-.dot-active  { background: var(--green);  box-shadow: 0 0 5px var(--green); }
-.dot-idle    { background: var(--amber); }
-.dot-blocked { background: var(--red); }
-.dot-offline { background: var(--muted); }
+.dot-active  { color: var(--green); filter: drop-shadow(0 0 3px var(--green)); }
+.dot-idle    { color: var(--amber); }
+.dot-blocked { color: var(--red); }
+.dot-offline { color: var(--muted); }
 .agent-time  { color: var(--muted); font-size: 10px; }
 
 /* ── Board Layout ──────────────────────────────────────────────────────── */
@@ -193,6 +193,9 @@ header {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.7px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
 }
 .col-badge {
   font-size: 11px;
@@ -240,7 +243,7 @@ header {
   border-radius: 7px;
   padding: 9px 11px;
   cursor: pointer;
-  transition: border-color 0.15s, transform 0.1s;
+  transition: border-color 0.15s, transform 0.1s, background 0.12s;
   position: relative;
 }
 .card:hover { border-color: var(--border-2); transform: translateY(-1px); }
@@ -349,8 +352,9 @@ header {
 }
 .lines-toggle {
   margin-left: auto;
-  font-size: 11px;
   color: var(--muted);
+  display: flex;
+  align-items: center;
 }
 .lines-body {
   overflow-y: auto;
@@ -411,11 +415,12 @@ header {
 }
 .modal-title { font-size: 14px; font-weight: 700; }
 .modal-close {
-  font-size: 18px;
   color: var(--muted);
   line-height: 1;
-  padding: 2px 6px;
+  padding: 4px;
   border-radius: 4px;
+  display: flex;
+  align-items: center;
 }
 .modal-close:hover { background: var(--surface-2); color: var(--text); }
 .modal-body { padding: 18px 20px; display: flex; flex-direction: column; gap: 14px; }
@@ -430,10 +435,13 @@ header {
   font-size: 13px;
   padding: 8px 11px;
   outline: none;
-  transition: border-color 0.15s;
+  transition: border-color 0.15s, box-shadow 0.15s;
   width: 100%;
 }
-.form-input:focus, .form-select:focus, .form-textarea:focus { border-color: var(--amber); }
+.form-input:focus, .form-select:focus, .form-textarea:focus {
+  border-color: var(--amber);
+  box-shadow: 0 0 0 2px rgba(245,158,11,.25);
+}
 .form-textarea { resize: vertical; min-height: 80px; }
 .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .modal-foot {
@@ -499,7 +507,14 @@ header {
   gap: 10px;
 }
 .detail-id { font-size: 11px; font-family: monospace; color: var(--muted); }
-.detail-close { margin-left: auto; color: var(--muted); font-size: 18px; padding: 0 4px; border-radius: 4px; }
+.detail-close {
+  margin-left: auto;
+  color: var(--muted);
+  padding: 4px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+}
 .detail-close:hover { background: var(--surface-2); color: var(--text); }
 .detail-body { padding: 18px; display: flex; flex-direction: column; gap: 14px; flex: 1; }
 .detail-title { font-size: 16px; font-weight: 700; line-height: 1.4; }
@@ -508,16 +523,42 @@ header {
 .meta-item { display: flex; flex-direction: column; gap: 3px; }
 .meta-label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.6px; color: var(--muted); }
 .meta-val { font-size: 12px; color: var(--text); font-weight: 500; }
+
+/* ── Detail section headers ────────────────────────────────────────────── */
+.detail-section-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  margin-bottom: 5px;
+}
+.detail-section-head svg { flex-shrink: 0; }
+.detail-section-head.context-head { color: var(--blue); }
+.detail-section-head.output-head  { color: var(--green); }
+.detail-section-head.review-head  { color: var(--purple); }
+
 .detail-context { background: rgba(96,165,250,.07); border-left: 3px solid var(--blue); border-radius: 0 6px 6px 0; padding: 10px 12px; font-size: 12px; color: var(--muted-2); line-height: 1.6; white-space: pre-wrap; }
-.detail-context-head { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; color: var(--blue); margin-bottom: 5px; }
-.detail-output { background: rgba(34,197,94,.07); border-left: 3px solid var(--green); border-radius: 0 6px 6px 0; padding: 10px 12px; font-size: 12px; color: var(--text); line-height: 1.6; white-space: pre-wrap; }
-.detail-output-head { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; color: var(--green); margin-bottom: 5px; }
-.detail-review { background: rgba(167,139,250,.07); border-left: 3px solid var(--purple); border-radius: 0 6px 6px 0; padding: 10px 12px; font-size: 12px; color: var(--text); line-height: 1.6; white-space: pre-wrap; }
-.detail-review-head { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; color: var(--purple); margin-bottom: 5px; }
+.detail-output  { background: rgba(34,197,94,.07);  border-left: 3px solid var(--green); border-radius: 0 6px 6px 0; padding: 10px 12px; font-size: 12px; color: var(--text); line-height: 1.6; white-space: pre-wrap; }
+.detail-review  { background: rgba(167,139,250,.07);border-left: 3px solid var(--purple);border-radius: 0 6px 6px 0; padding: 10px 12px; font-size: 12px; color: var(--text); line-height: 1.6; white-space: pre-wrap; }
+
 .detail-tags { display: flex; flex-wrap: wrap; gap: 5px; }
 .tag-chip { background: rgba(245,158,11,.12); color: var(--amber); border-radius: 4px; padding: 2px 7px; font-size: 10px; font-weight: 600; letter-spacing: 0.3px; }
 .card-tags { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 4px; }
-.iteration-badge { display: inline-flex; align-items: center; gap: 3px; background: rgba(167,139,250,.15); color: var(--purple); border-radius: 4px; padding: 1px 6px; font-size: 10px; font-weight: 700; margin-left: 4px; }
+.iteration-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  background: rgba(167,139,250,.15);
+  color: var(--purple);
+  border-radius: 4px;
+  padding: 1px 6px;
+  font-size: 10px;
+  font-weight: 700;
+  margin-left: 4px;
+}
 .detail-msgs { margin-top: 4px; }
 .detail-msgs-head { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; color: var(--muted); margin-bottom: 8px; }
 .detail-msg-item { background: var(--surface-2); border-radius: 6px; padding: 8px 10px; margin-bottom: 6px; font-size: 12px; }
@@ -580,7 +621,7 @@ header {
 <header>
   <div class="header-brand">
     <svg class="logo-mark" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <!-- Patch panel: 3×2 grid of jacks + one cable arc -->
+      <!-- Patch panel: 3x2 grid of jacks + one cable arc -->
       <rect width="28" height="28" rx="6" fill="#1A1E2B"/>
       <!-- Jacks -->
       <circle cx="8"  cy="10" r="2.5" fill="#252A38" stroke="#F59E0B" stroke-width="1.2"/>
@@ -589,14 +630,14 @@ header {
       <circle cx="8"  cy="18" r="2.5" fill="#252A38" stroke="#5C6278" stroke-width="1.2"/>
       <circle cx="14" cy="18" r="2.5" fill="#252A38" stroke="#22C55E" stroke-width="1.2"/>
       <circle cx="20" cy="18" r="2.5" fill="#252A38" stroke="#F59E0B" stroke-width="1.2"/>
-      <!-- Cable: amber jack top-left → green jack bottom-mid -->
+      <!-- Cable: amber jack top-left to green jack bottom-mid -->
       <path d="M8 12.5 C8 15.5 14 14.5 14 15.5" stroke="#F59E0B" stroke-width="1.4" stroke-linecap="round" fill="none"/>
-      <!-- Cable: green bottom-mid → amber jack bottom-right -->
+      <!-- Cable: green bottom-mid to amber jack bottom-right -->
       <path d="M14 15.5 C14 16.5 20 16.5 20 15.5" stroke="#22C55E" stroke-width="1.4" stroke-linecap="round" fill="none"/>
       <!-- Center dot on active jacks -->
-      <circle cx="8"  cy="10" r="1"   fill="#F59E0B"/>
-      <circle cx="14" cy="18" r="1"   fill="#22C55E"/>
-      <circle cx="20" cy="18" r="1"   fill="#F59E0B"/>
+      <circle cx="8"  cy="10" r="1" fill="#F59E0B"/>
+      <circle cx="14" cy="18" r="1" fill="#22C55E"/>
+      <circle cx="20" cy="18" r="1" fill="#F59E0B"/>
     </svg>
     <span class="header-name">Switchboard</span>
     <span class="header-sep"></span>
@@ -608,7 +649,9 @@ header {
   <div class="header-right">
     <span class="refresh-ts" id="refresh-ts">—</span>
     <button class="btn-new" onclick="openNewTask()">
-      <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor"><path d="M6 1v10M1 6h10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+        <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+      </svg>
       New Task
     </button>
   </div>
@@ -628,12 +671,14 @@ header {
 <!-- ── Messages / Incoming Lines ─────────────────────────────────────────── -->
 <div class="lines-panel" id="lines-panel">
   <div class="lines-head" onclick="toggleLines()">
-    <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-      <path d="M2 3h10M2 7h7M2 11h5" stroke="#F59E0B" stroke-width="1.5" stroke-linecap="round"/>
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
     </svg>
     <span class="lines-head-label">Incoming Lines</span>
     <span class="lines-badge" id="lines-badge" style="display:none">0</span>
-    <span class="lines-toggle" id="lines-toggle">▲</span>
+    <span class="lines-toggle" id="lines-toggle">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m18 15-6-6-6 6"/></svg>
+    </span>
   </div>
   <div class="lines-body" id="lines-body"></div>
 </div>
@@ -643,7 +688,9 @@ header {
   <div class="modal">
     <div class="modal-head">
       <span class="modal-title">New Task</span>
-      <button class="modal-close" onclick="closeNewTask()">×</button>
+      <button class="modal-close" onclick="closeNewTask()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
     </div>
     <div class="modal-body">
       <div class="form-group">
@@ -710,16 +757,36 @@ header {
       <div>
         <div class="detail-id" id="d-id"></div>
       </div>
-      <button class="detail-close" onclick="closeDetail()">×</button>
+      <button class="detail-close" onclick="closeDetail()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
     </div>
     <div class="detail-body">
       <div class="detail-title" id="d-title"></div>
       <div class="detail-desc" id="d-desc" style="display:none"></div>
       <div class="detail-tags" id="d-tags" style="display:none"></div>
       <div class="detail-meta" id="d-meta"></div>
-      <div id="d-context" style="display:none"><div class="detail-context-head">⚡ Instructions</div><div class="detail-context"></div></div>
-      <div id="d-output" style="display:none"><div class="detail-output-head">✅ Agent Output</div><div class="detail-output"></div></div>
-      <div id="d-review" style="display:none"><div class="detail-review-head">🔍 Review Notes</div><div class="detail-review"></div></div>
+      <div id="d-context" style="display:none">
+        <div class="detail-section-head context-head">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+          Instructions
+        </div>
+        <div class="detail-context"></div>
+      </div>
+      <div id="d-output" style="display:none">
+        <div class="detail-section-head output-head">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+          Output
+        </div>
+        <div class="detail-output"></div>
+      </div>
+      <div id="d-review" style="display:none">
+        <div class="detail-section-head review-head">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          Review
+        </div>
+        <div class="detail-review"></div>
+      </div>
       <div class="detail-msgs" id="d-msgs"></div>
     </div>
   </div>
@@ -732,14 +799,16 @@ let _msgs  = [];
 let _linesOpen = true;
 let _activeTaskId = null;
 
+const ITER_SVG = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg>';
+
 const COLS = [
-  { key: 'inbox',       label: 'Inbox' },
-  { key: 'todo',        label: 'To Do' },
-  { key: 'in_progress', label: 'In Progress' },
-  { key: 'review',      label: 'Review' },
-  { key: 'done',        label: 'Done' },
-  { key: 'failed',      label: 'Failed' },
-  { key: 'blocked',     label: 'Blocked' },
+  { key: 'inbox',       label: 'Inbox',       icon: '<path d="M22 12h-6l-2 3H10l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>' },
+  { key: 'todo',        label: 'To Do',       icon: '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/>' },
+  { key: 'in_progress', label: 'In Progress', icon: '<path d="M21 12a9 9 0 1 1-6.219-8.56"/>' },
+  { key: 'review',      label: 'Review',      icon: '<path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/>' },
+  { key: 'done',        label: 'Done',        icon: '<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>' },
+  { key: 'failed',      label: 'Failed',      icon: '<circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>' },
+  { key: 'blocked',     label: 'Blocked',     icon: '<circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/>' },
 ];
 
 // ── Helpers ───────────────────────────────────────────────────────────────
@@ -771,7 +840,7 @@ async function refresh() {
     renderAll();
     document.getElementById('refresh-ts').textContent = new Date().toLocaleTimeString();
   } catch(e) {
-    document.getElementById('refresh-ts').textContent = '⚠ Unreachable';
+    document.getElementById('refresh-ts').innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> Unreachable';
   }
 }
 
@@ -807,8 +876,9 @@ function renderAgents() {
   chips.innerHTML = agents.map(a => {
     const status = agentStatus(a);
     const dotCls = status === 'active' ? 'dot-active' : status === 'idle' ? 'dot-idle' : status === 'blocked' ? 'dot-blocked' : 'dot-offline';
+    const dotColor = status === 'active' ? 'var(--green)' : status === 'idle' ? 'var(--amber)' : status === 'blocked' ? 'var(--red)' : 'var(--muted)';
     return `<div class="agent-chip">
-      <span class="agent-dot ${dotCls}"></span>
+      <span class="agent-status-icon ${dotCls}"><svg width="8" height="8" viewBox="0 0 8 8" style="color:${dotColor}"><circle cx="4" cy="4" r="3" fill="currentColor"/></svg></span>
       <span>${esc(a.name)}</span>
       <span class="agent-time">${ago(a.last_heartbeat)}</span>
     </div>`;
@@ -825,7 +895,7 @@ function renderBoard() {
           <div class="card-id">#${t.id}</div>
           <div class="card-title">${esc(t.title)}</div>
           ${t.description ? `<div class="card-desc">${esc(t.description)}</div>` : ''}
-          ${t.tags && t.tags.length ? `<div class="card-tags">${t.tags.map(tg=>`<span class="tag-chip">${esc(tg)}</span>`).join('')}${t.iteration>0?`<span class="iteration-badge">↩ ${t.iteration}</span>`:''}</div>` : (t.iteration>0 ? `<div class="card-tags"><span class="iteration-badge">↩ iter ${t.iteration}</span></div>` : '')}
+          ${t.tags && t.tags.length ? `<div class="card-tags">${t.tags.map(tg=>`<span class="tag-chip">${esc(tg)}</span>`).join('')}${t.iteration>0?`<span class="iteration-badge">${ITER_SVG} iter ${t.iteration}</span>`:''}</div>` : (t.iteration>0 ? `<div class="card-tags"><span class="iteration-badge">${ITER_SVG} iter ${t.iteration}</span></div>` : '')}
           <div class="card-foot">
             ${t.assignee ? `<span class="card-assignee">${esc(t.assignee)}</span>` : ''}
             <span class="card-time">${ago(t.updated_at)}</span>
@@ -833,9 +903,10 @@ function renderBoard() {
         </div>`).join('')
       : `<div class="card-empty">—</div>`;
 
+    const colIcon = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${col.icon}</svg>`;
     return `<div class="col col-${col.key}">
       <div class="col-head">
-        <span class="col-title">${col.label}</span>
+        <span class="col-title">${colIcon}${col.label}</span>
         <span class="col-badge">${items.length}</span>
       </div>
       <div class="col-body">${cards}</div>
@@ -870,7 +941,9 @@ function renderLines() {
 function toggleLines() {
   _linesOpen = !_linesOpen;
   document.getElementById('lines-panel').classList.toggle('collapsed', !_linesOpen);
-  document.getElementById('lines-toggle').textContent = _linesOpen ? '▲' : '▼';
+  document.getElementById('lines-toggle').innerHTML = _linesOpen
+    ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m18 15-6-6-6 6"/></svg>'
+    : '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>';
 }
 
 // ── New Task Modal ────────────────────────────────────────────────────────
@@ -944,7 +1017,7 @@ async function refreshDetail(id) {
     if (task.review_notes) { revWrap.style.display = ''; revWrap.querySelector('.detail-review').textContent = task.review_notes; }
     else revWrap.style.display = 'none';
 
-    const iterBadge = task.iteration > 0 ? `<span class="iteration-badge">↩ iter ${task.iteration}</span>` : '';
+    const iterBadge = task.iteration > 0 ? `<span class="iteration-badge">${ITER_SVG} iter ${task.iteration}</span>` : '';
     document.getElementById('d-meta').innerHTML = `
       <div class="meta-item"><span class="meta-label">Status</span>   <span class="meta-val"><span class="badge badge-${task.status}">${task.status.replace('_',' ')}</span>${iterBadge}</span></div>
       <div class="meta-item"><span class="meta-label">Priority</span>  <span class="meta-val"><span class="badge badge-pri-${task.priority}">${task.priority}</span></span></div>
