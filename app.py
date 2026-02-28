@@ -210,12 +210,20 @@ def task_queue(
     if status not in ("todo", "review"):
         raise HTTPException(400, "status must be 'todo' or 'review'")
     with get_db() as con:
-        rows = con.execute("""
-            SELECT * FROM tasks
-            WHERE status = ?
-              AND (assignee = ? OR assignee IS NULL)
-            ORDER BY created_at ASC
-        """, (status, agent)).fetchall()
+        if status == "review":
+            # QA sees ALL tasks in review — don't filter by assignee
+            rows = con.execute("""
+                SELECT * FROM tasks
+                WHERE status = 'review'
+                ORDER BY updated_at ASC
+            """).fetchall()
+        else:
+            rows = con.execute("""
+                SELECT * FROM tasks
+                WHERE status = ?
+                  AND (assignee = ? OR assignee IS NULL)
+                ORDER BY created_at ASC
+            """, (status, agent)).fetchall()
 
     tasks = [row_to_dict(r) for r in rows]
     tasks.sort(key=lambda t: PRIORITY_ORDER.get(t.get("priority", "normal"), 2))
